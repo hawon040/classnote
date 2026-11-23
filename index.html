@@ -43,7 +43,7 @@ h1,h2,h3{margin:0}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:40}
 .hero{top:env(safe-area-inset-top,0px)}
 
-.content{padding:14px 16px 150px}
+.content{padding:14px 16px calc(96px + env(safe-area-inset-bottom,0px))}
 .sublabel{font-family:var(--disp);font-weight:800;font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
 
 /* 시간표 그리드 */
@@ -221,7 +221,7 @@ const SEM_START="2026-09-01";
 let state={currentSem:"2026-2", semesters:{}, records:[]};
 let view="home";
 let sel={classId:null, week:"current", wkOpen:false};   // 수업별 화면 상태
-let semOpen=false, addMethod="manual";
+let semOpen=false, addMethod="manual", capRef=null;
 let quick={open:false, classId:null, type:"memo", tag:"일반", photo:null, exif:null};
 
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -318,8 +318,18 @@ function gridRange(){
 function renderHome(){
   const cls=classesCur();
   const {lo,hi}=gridRange();
-  const rowH=52, hours=(hi-lo)/60, bodyH=hours*rowH;
-  const gutter=30, cols=5, colW=(390-32-gutter)/cols; // 좌우패딩16
+  const hours=(hi-lo)/60;
+  // 화면 높이에 맞춰 행 높이 자동 — 긴 폰에서 시간표가 꽉 차도록
+  const heroEl=document.querySelector(".hero"), tabEl=document.querySelector(".tabbar");
+  const heroH=heroEl?heroEl.offsetHeight:140, tabH=tabEl?tabEl.offsetHeight:84;
+  const vh=window.innerHeight||760;
+  let rowH=Math.floor((vh-heroH-tabH-150)/Math.max(hours,1));
+  rowH=Math.max(46,Math.min(110,rowH));
+  const bodyH=hours*rowH;
+  // 화면 너비에 맞춰 열 너비 자동
+  const gutter=30, cols=5;
+  const usable=Math.max(300,(content.clientWidth||390)-32);
+  const colW=(usable-gutter)/cols;
   let lines="",labs="",vls="",blocks="";
   for(let h=0;h<=hours;h++){
     const y=h*rowH;
@@ -354,7 +364,7 @@ function renderHome(){
         <span class="t">${semLabel(state.currentSem)} 시간표</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(${semOpen?180:0}deg)"><path d="M6 9l6 6 6-6"/></svg>
       </button>
-      <button class="miniadd" id="semphoto" aria-label="시간표 사진으로 최신화">
+      <button class="miniadd" id="semphoto" aria-label="수업 추가">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
     </div>
@@ -363,11 +373,11 @@ function renderHome(){
     <div class="gridbody" style="height:${bodyH}px;margin-left:${gutter}px;width:${cols*colW}px">
       ${labs}${lines}${vls}${blocks}
     </div>
-    ${cls.length===0?`<div class="empty"><b>이 학기 시간표가 비어 있어요</b>옆의 + 버튼으로 사진 최신화 또는<br>직접 수업을 추가하세요.</div>`:
+    ${cls.length===0?`<div class="empty"><b>이 학기 시간표가 비어 있어요</b>오른쪽 위 + 버튼으로<br>수업을 추가하세요.</div>`:
       `<p class="hint">수업 블록을 누르면 그 수업에 바로 메모·사진을 남길 수 있어요.</p>`}`;
   content.querySelectorAll("[data-cls]").forEach(b=>b.onclick=()=>openQuick(b.dataset.cls));
   content.querySelector("#semsel").onclick=()=>{semOpen=!semOpen;render();};
-  content.querySelector("#semphoto").onclick=()=>{addMethod="photo";semOpen=false;view="addclass";render();};
+  content.querySelector("#semphoto").onclick=()=>{addMethod="manual";semOpen=false;view="addclass";render();};
   if(semOpen){
     content.querySelectorAll("#semmenu [data-sem]").forEach(b=>b.onclick=()=>{state.currentSem=b.dataset.sem;sel.classId=null;semOpen=false;save();render();});
     content.querySelector("#semAdd").onclick=()=>{
@@ -568,7 +578,7 @@ function renderAddClass(){
     <div class="sublabel" style="margin-bottom:12px">방식 선택</div>
     <button class="opt ${addMethod==="photo"?"on":""}" data-m="photo">
       <span class="ic" style="background:var(--lime);color:var(--ink)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="2"/><circle cx="12" cy="12.5" r="3.2"/><path d="M8 5l1.5-2h5L16 5"/></svg></span>
-      <span><span class="ti">에타 시간표로 추가</span><span class="de">에브리타임 시간표 캡처를 올리면 자동 인식 (준비 중)</span></span>
+      <span><span class="ti">에타 캡처 보며 입력</span><span class="de">에브리타임 시간표 캡처를 띄워두고 보면서 입력 (자동 인식은 준비 중)</span></span>
     </button>
     <button class="opt ${addMethod==="manual"?"on":""}" data-m="manual">
       <span class="ic" style="background:var(--tomato);color:var(--ink)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>
@@ -578,16 +588,16 @@ function renderAddClass(){
   content.querySelector("#back").onclick=()=>{view="home";render();};
   content.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{addMethod=b.dataset.m;renderAddClass();});
   const mb=content.querySelector("#methodBody");
-  if(addMethod==="manual"){
-    const dayOpts=DAYS.map((d,i)=>`<option value="${i}">${d}</option>`).join("");
-    mb.innerHTML=`
-      <div class="field"><label>수업명</label><input id="f_name" placeholder="예) 자료구조"></div>
-      <div class="two"><div class="field"><label>담당교수</label><input id="f_prof" placeholder="김민재"></div>
-        <div class="field"><label>강의실</label><input id="f_room" placeholder="공101"></div></div>
-      <div class="field"><label>요일</label><select id="f_day">${dayOpts}</select></div>
-      <div class="two"><div class="field"><label>시작</label><input id="f_start" type="time" value="09:00"></div>
-        <div class="field"><label>종료</label><input id="f_end" type="time" value="10:50"></div></div>
-      <button class="btn" id="f_add">수업 추가</button>`;
+  const dayOpts=DAYS.map((d,i)=>`<option value="${i}">${d}</option>`).join("");
+  const formHTML=`
+    <div class="field"><label>수업명</label><input id="f_name" placeholder="예) 자료구조"></div>
+    <div class="two"><div class="field"><label>담당교수</label><input id="f_prof" placeholder="김민재"></div>
+      <div class="field"><label>강의실</label><input id="f_room" placeholder="공101"></div></div>
+    <div class="field"><label>요일</label><select id="f_day">${dayOpts}</select></div>
+    <div class="two"><div class="field"><label>시작</label><input id="f_start" type="time" value="09:00"></div>
+      <div class="field"><label>종료</label><input id="f_end" type="time" value="10:50"></div></div>
+    <button class="btn" id="f_add">수업 추가</button>`;
+  const wireForm=()=>{
     mb.querySelector("#f_add").onclick=()=>{
       const name=mb.querySelector("#f_name").value.trim();if(!name){toast("수업명을 입력하세요");return;}
       const s=toMin(mb.querySelector("#f_start").value),e=toMin(mb.querySelector("#f_end").value);
@@ -595,12 +605,18 @@ function renderAddClass(){
       const arr=(state.semesters[state.currentSem]=state.semesters[state.currentSem]||[]);
       arr.push({id:uid(),name,prof:mb.querySelector("#f_prof").value.trim(),room:mb.querySelector("#f_room").value.trim(),
         day:Number(mb.querySelector("#f_day").value),start:s,end:e,color:PALETTE[arr.length%PALETTE.length]});
-      save();toast(semLabel(state.currentSem)+"에 수업 추가됨");view="home";render();};
+      save();toast(semLabel(state.currentSem)+"에 수업 추가됨");capRef=null;view="home";render();};
+  };
+  if(addMethod==="photo"){
+    const pv=capRef
+      ?`<img src="${capRef}" alt="에타 캡처"><span class="ex">이 캡처를 보고 아래에 입력 · 탭하면 다시 선택</span>`
+      :`<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--lime)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg><span style="color:var(--cream);font-weight:800">에타 시간표 캡처 올리기</span><span>캡처를 띄워두고 아래 폼에 입력하세요</span>`;
+    mb.innerHTML=`<label class="photopick" id="capPick">${pv}<input type="file" id="capFile" accept="image/*" hidden></label>${formHTML}`;
+    mb.querySelector("#capFile").onchange=e=>{const f=e.target.files[0];if(!f)return;processPhotoFile(f,(d)=>{if(d){capRef=d;renderAddClass();}else toast("이미지를 불러오지 못했어요");});};
+    wireForm();
   }else{
-    mb.innerHTML=`<div class="photopick" style="min-height:150px">
-      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--lime)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
-      <span style="color:var(--cream);font-weight:800">시간표 캡처 올리기</span>
-      <span>이미지 자동 인식은 준비 중 — 지금은 '직접 입력'을 사용하세요</span></div>`;
+    mb.innerHTML=formHTML;
+    wireForm();
   }
 }
 
@@ -620,6 +636,9 @@ document.getElementById("camBtn").onclick=()=>{
 document.getElementById("camInput").onchange=e=>{const f=e.target.files[0];if(!f)return;
   processPhotoFile(f,(dataUrl,exif)=>{if(!dataUrl){toast("사진을 불러오지 못했어요");return;}openCameraRecord(dataUrl,exif);});
   e.target.value="";};
+
+// 화면 크기 변경(회전/주소창 변화) 시 홈 시간표 다시 맞춤 — 디바운스, 입력 중엔 생략
+let _rsz; window.addEventListener("resize",()=>{clearTimeout(_rsz);_rsz=setTimeout(()=>{if(view==="home"&&!quick.open)render();},160);});
 
 // 시작
 (function(){
