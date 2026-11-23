@@ -74,20 +74,29 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .semadd button{margin-left:auto;background:var(--tomato);color:var(--ink);font-weight:800;font-size:13px;padding:8px 14px;border-radius:9px}
 
 /* 하단 바 + FAB */
-.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:#141414;border-top:1px solid var(--line);max-width:470px;margin:0 auto;
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(18,18,18,.82);
+  backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);
+  border-top:1px solid rgba(255,255,255,.08);max-width:470px;margin:0 auto;
   padding:9px 16px calc(12px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;justify-content:space-around}
-.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:11px;font-weight:700}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:11px;font-weight:700;transition:color .18s}
 .tab.on{color:var(--lime)}
+.tab svg{transition:transform .18s}
+.tab.on svg{transform:translateY(-1px) scale(1.04)}
 .tab svg{width:23px;height:23px}
 .fab{width:58px;height:58px;border-radius:50%;background:var(--lime);color:var(--ink);display:grid;place-items:center;margin-top:-26px;flex:0 0 auto;box-shadow:0 8px 20px rgba(134,230,63,.4)}
 .fab svg{width:28px;height:28px}
 
 /* 빠른 기록 패널 */
-.scrim{position:fixed;inset:0;z-index:35;background:rgba(0,0,0,.5);display:none}
-.scrim.open{display:block}
-.quick{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));width:min(438px,calc(100% - 32px));z-index:36;
-  background:var(--surface);border:1px solid var(--lime);border-radius:16px;padding:14px;box-shadow:0 14px 34px rgba(0,0,0,.6);display:none}
-.quick.open{display:block}
+.scrim{position:fixed;inset:0;z-index:35;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  opacity:0;visibility:hidden;transition:opacity .24s ease,visibility .24s}
+.scrim.open{opacity:1;visibility:visible}
+.quick{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom,0px));width:min(440px,calc(100% - 22px));z-index:36;
+  background:rgba(23,23,23,.97);backdrop-filter:blur(24px) saturate(1.3);-webkit-backdrop-filter:blur(24px) saturate(1.3);
+  border:1px solid rgba(134,230,63,.45);border-radius:24px;padding:9px 15px 15px;box-shadow:0 22px 52px rgba(0,0,0,.66);
+  transform:translateX(-50%) translateY(24px);opacity:0;visibility:hidden;pointer-events:none;
+  transition:transform .32s cubic-bezier(.22,1,.36,1),opacity .24s ease,visibility .32s}
+.quick.open{transform:translateX(-50%) translateY(0);opacity:1;visibility:visible;pointer-events:auto}
+.sheet-handle{width:40px;height:4px;border-radius:3px;background:#4a4a4a;margin:0 auto 11px;flex:0 0 auto}
 .qhead{display:flex;align-items:center;gap:8px;margin-bottom:11px;flex-wrap:wrap}
 .qclass{font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;background:var(--lime);color:var(--ink)}
 .seg{display:flex;gap:6px}
@@ -167,7 +176,28 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .qauto .dot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 0 4px rgba(134,230,63,.18)}
 .qauto.warn{background:#241207;border-color:#4a2a15;color:#e8c3a8}
 .qauto.warn b{color:var(--tomato)}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ===== 네이티브 앱 느낌 ===== */
+html{-webkit-text-size-adjust:100%}
+*{-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+body{overscroll-behavior-y:none}
+.app,.content{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.app,.tabbar,.quick,.hero{user-select:none;-webkit-user-select:none}
+input,textarea,.rmemo{user-select:text;-webkit-user-select:text}
+button{touch-action:manipulation;transition:transform .09s ease}
+/* 누름 피드백 */
+button:active{transform:scale(.95)}
+.blk:active,.opt:active,.rec:active,.cchip:active,.semrow:active,.wkrow:active,.wkbtn:active,.semsel:active{transform:scale(.98)}
+.fab:active{transform:scale(.9)}
+.save:active,.btn:active,.cambtn:active,.miniadd:active{transform:scale(.93)}
+.tab:active{transform:scale(.9)}
+/* 화면 전환 애니메이션 (뷰 바뀔 때만) */
+@keyframes viewin{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.content.viewin{animation:viewin .26s cubic-bezier(.22,1,.36,1)}
+/* FAB 미세 상승 유지 */
+.fab{transition:transform .12s ease,box-shadow .2s}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
 <div class="app">
@@ -221,7 +251,7 @@ const SEM_START="2026-09-01";
 let state={currentSem:"2026-2", semesters:{}, records:[]};
 let view="home";
 let sel={classId:null, week:"current", wkOpen:false};   // 수업별 화면 상태
-let semOpen=false, addMethod="manual", capRef=null;
+let semOpen=false, addMethod="manual", capRef=null, _lastView=null;
 let quick={open:false, classId:null, type:"memo", tag:"일반", photo:null, exif:null};
 
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -305,6 +335,7 @@ function render(){
   if(view==="home")renderHome();
   else if(view==="byclass")renderByClass();
   else if(view==="addclass")renderAddClass();
+  if(view!==_lastView){content.classList.remove("viewin");void content.offsetWidth;content.classList.add("viewin");_lastView=view;}
   renderQuick();
 }
 
@@ -455,6 +486,7 @@ function renderQuick(){
     body=`<label class="photopick" id="qpick">${pv}<input type="file" id="qfile" accept="image/*" hidden></label>`;
   }
   q.innerHTML=`
+    <div class="sheet-handle"></div>
     <div class="qhead">
       <span class="disp" style="font-weight:900;font-size:14px;color:var(--cream)">빠른 기록</span>
       <select class="qclasssel" id="qclasssel" required>${classOpts}</select>
